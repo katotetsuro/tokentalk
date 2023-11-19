@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
-	// import RecordRTC from 'recordrtc';
 	import type RecordRTC from 'recordrtc';
+	import TalkThemeSelectDialog from './TalkThemeSelectDialog.svelte';
+	import SettingDialog from './SettingDialog.svelte';
 
 	let chunks: Array<Blob> = [];
 	let mediaRecorder: RecordRTC;
@@ -41,7 +42,6 @@
 
 	onMount(async () => {
 		init();
-		send(false);
 	});
 
 	const start = async () => {
@@ -77,7 +77,7 @@
 			const blob = mediaRecorder.getBlob();
 
 			file = new File([blob], 'input.wav');
-			audioURL = URL.createObjectURL(file);
+			// audioURL = URL.createObjectURL(file);
 
 			const data = new FormData();
 			data.append('file', file, 'input.wav');
@@ -112,7 +112,7 @@
 		}
 		const res = await fetch('/api/talk', {
 			method: 'POST',
-			body: JSON.stringify({ input, record: recordInput }),
+			body: JSON.stringify({ input, record: recordInput, theme }),
 			headers: {
 				'Content-Type': 'application/json'
 			}
@@ -148,6 +148,8 @@
 		}
 	}
 
+	let theme: string | null;
+
 	const messages = {
 		ready: 'マイクを長押ししている間に入力できます',
 		recording: '録音中',
@@ -175,23 +177,15 @@
 		</div>
 		<div class="helper-text">{messages[inputState]}</div>
 		<div class="options-container">
-			<div>
-				<button
-					class="reset"
-					on:click={async () => {
-						await fetch('/api/reset');
-						chats = [];
-						send(false);
-					}}>会話のコンテキストを削除</button
-				>
-			</div>
-			<div>
-				<select on:change={(e) => (voiceIndex = parseInt(e.currentTarget.value))}>
-					{#each voices as voice, i}
-						<option value={i}>{voice.name}, {voice.lang}</option>
-					{/each}
-				</select>
-			</div>
+			<SettingDialog
+				bind:voiceIndex
+				{voices}
+				on:reset={async () => {
+					await fetch('/api/reset');
+					chats = [];
+					theme = null;
+				}}
+			/>
 		</div>
 		<div style="display: none;">
 			<textarea bind:value={input} />
@@ -199,6 +193,12 @@
 		</div>
 	</div>
 	<audio style="display: none;" src={audioURL} controls />
+	<TalkThemeSelectDialog
+		bind:selectedTheme={theme}
+		on:close={() => {
+			send(false);
+		}}
+	/>
 </div>
 
 <style>
@@ -212,13 +212,14 @@
 		box-shadow: 0 0 8px 0 rgba(0, 0, 0, 0.1);
 		display: grid;
 		grid-template-rows: auto 180px;
-		font-family: 'Roboto', sans-serif;
+		font-family: 'Noto Sans JP', 'Roboto', sans-serif;
 	}
 
 	div.history {
 		padding: 16px;
 		margin-top: auto;
 		overflow-y: scroll;
+		font-family: 'Roboto', sans-serif;
 	}
 
 	.record-button {
@@ -229,6 +230,7 @@
 		box-shadow: 0 0 8px 0 rgba(0, 0, 0, 0.2);
 		font-size: 32px;
 		cursor: pointer;
+		background-color: white;
 	}
 
 	.record {

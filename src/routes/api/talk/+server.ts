@@ -3,10 +3,6 @@ import { uuid } from '../../../../src/uuid';
 import { ACCOUNT_ID, TOKEN } from '$env/static/private';
 
 
-interface Env {
-    HISTORY: KVNamespace
-}
-
 const initCookie = (headers: Headers) => {
     const cookie = parse(headers.get('Cookie') || '')
 
@@ -26,7 +22,7 @@ type Chat = {
 export const POST = async ({ request, platform }) => {
 
     const json = JSON.parse(await request.text())
-    const { input, record } = json;
+    const { input, record, theme } = json;
 
     const { has, id } = initCookie(request.headers);
 
@@ -43,7 +39,9 @@ export const POST = async ({ request, platform }) => {
 
     const currentUserInput = { role: "user", content: input || '' };
 
-    const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/@cf/meta/llama-2-7b-chat-int8`,
+    const model = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/@cf/meta/llama-2-7b-chat-fp16`
+    // const model = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/@cf/mistral/mistral-7b-instruct-v0.1`
+    const res = await fetch(model,
         {
             method: 'POST',
             headers: {
@@ -52,14 +50,15 @@ export const POST = async ({ request, platform }) => {
             },
             body: JSON.stringify({
                 messages: [
-                    { role: "system", content: "You are a kind English teacher." },
+                    { role: "system", content: `You are a kind English teacher. ${theme ? 'Talk theme is ' + theme : ''}. Keep sentences to two or three, and try to listen to the students as much as possible.` },
                     ...history,
                     currentUserInput
                 ]
             })
         })
 
-    const response = res.ok ? (await res.json() as any).result.response : 'failed to talk with ai'
+    const regex: RegExp = /\*.*?\*/g;
+    const response = res.ok ? (await res.json() as any).result.response.replace(regex, '') : 'failed to talk with ai'
 
     if (!res.ok) {
         const error = await res.json() as any;
